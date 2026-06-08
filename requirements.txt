@@ -1,0 +1,8 @@
+Flask
+Flask-SQLAlchemy
+PyMySQL
+PyMongo
+python-dotenv
+pytest
+pytest-flask
+mongomock
