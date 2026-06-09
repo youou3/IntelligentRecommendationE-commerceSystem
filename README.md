@@ -1,6 +1,10 @@
 # IntelligentRecommendationE-commerceSystem
 
-中小型智能电商 SaaS 系统的第一阶段实现，包含：
+中小型智能电商 SaaS 系统的阶段性实现。
+
+## 已实现能力
+
+### 第一阶段
 
 - Flask 项目基础结构
 - MySQL + MongoDB 基础连接
@@ -9,6 +13,16 @@
 - 基础用户画像生成接口
 - 标签匹配推荐接口
 - 推荐曝光 / 点击 / 加购 / 转化反馈记录
+- `init_db.py` MySQL 初始化脚本
+
+### 第二阶段
+
+- 商品标签向量化
+- 用户画像权重升级与时间衰减
+- 余弦相似度推荐
+- 业务过滤与冷启动推荐
+- 智能选品评分接口
+- 商品分层与运营建议
 
 ## 1. 本地启动
 
@@ -26,7 +40,15 @@ python3 -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-### 1.3 启动服务
+### 1.3 初始化 MySQL 表
+
+```bash
+python init_db.py
+```
+
+如果 MySQL 连接正常、账号具备建表权限，这会在 `intelligent_recommendation` 库里创建当前模型对应的表。脚本会自动加载 `.env`。若执行时报 `Can't connect to MySQL server`，先检查 `.env` 里的 `MYSQL_HOST`、`MYSQL_PORT` 和数据库服务是否可达。
+
+### 1.4 启动服务
 
 ```bash
 python run.py
@@ -47,6 +69,8 @@ python3 -m pytest
 - 推荐接口
 - 推荐反馈接口
 - 幂等性
+- 第二阶段推荐算法
+- 第二阶段选品评分
 
 ## 3. 主要接口
 
@@ -69,6 +93,10 @@ python3 -m pytest
 ### 推荐反馈
 
 - `POST /api/recommendations/feedback`
+
+### 选品评分
+
+- `POST /api/products/selection-score`
 
 ## 4. 配置说明
 
@@ -95,4 +123,4 @@ python3 -m pytest
 
 ## 6. 说明
 
-第一阶段只实现推荐闭环的最小可用版本，后续的选品、库存预警、自动补货和工作流编排会继续在现有结构上迭代。
+本仓库当前优先实现推荐闭环的最小可用版本，并逐步补齐选品、库存预警、自动补货和工作流编排能力。

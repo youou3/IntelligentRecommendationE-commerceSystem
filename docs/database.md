@@ -42,10 +42,14 @@
 - `name`
 - `category_id`
 - `tags`
+- `tag_vector`
 - `price`
 - `cost_price`
 - `gross_margin`
 - `status`
+- `selection_score`
+- `product_layer`
+- `operation_advice`
 - `created_at`
 
 ### 3.3 `orders`
@@ -150,11 +154,29 @@
 - `tenant_id`
 - `merchant_id`
 - `request_id`
+- `event_id`
 - `user_id`
 - `product_id`
 - `scene`
+- `feedback_type`
 - `click_flag`
+- `add_cart_flag`
 - `convert_flag`
+- `created_at`
+
+### 3.11 `product_selection_snapshots`
+
+建议字段：
+
+- `id`
+- `tenant_id`
+- `merchant_id`
+- `request_id`
+- `product_id`
+- `selection_score`
+- `layer`
+- `metrics`
+- `advice`
 - `created_at`
 
 ## 4. MongoDB 事件集合建议

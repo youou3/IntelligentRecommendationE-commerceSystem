@@ -94,12 +94,19 @@
 - `user_id`
 - `scene`
 - `limit`
+- `exclude_product_ids`
+- `min_stock`
+- `dedup_days`
+- `max_recent_exposures`
 
 返回结果建议包含：
 
 - 推荐商品列表。
 - 推荐请求 ID。
+- 推荐策略标识。
+- 冷启动标识。
 - 推荐解释字段。
+- 商品库存信息。
 
 ### 3.3 选品评分接口
 
@@ -114,6 +121,14 @@
 - `request_id`
 - `product_ids`
 - `date_range`
+- `persist`
+
+返回结果建议包含：
+
+- 商品选品评分。
+- 商品分层。
+- 运营建议。
+- 关键指标：曝光、点击、加购、转化、CTR、加购率、转化率、毛利、有效库存。
 
 ### 3.4 库存预警接口
 

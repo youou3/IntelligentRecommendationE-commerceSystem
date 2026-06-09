@@ -7,7 +7,7 @@ def test_generate_profile(client, app):
     with app.app_context():
         from app.core.database import get_mongo_db
         mongo_db = get_mongo_db()
-        mongo_db.behavior_events.insert_many([
+        mongo_db.behavior_events.insert_many([ # type: ignore
             {
                 'tenant_id': 'T1',
                 'merchant_id': 'M1',
