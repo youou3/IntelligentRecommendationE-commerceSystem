@@ -18,6 +18,7 @@
 - [database.md](database.md)：MySQL / MongoDB 表与集合设计、字段、索引和租户预留要求。
 - [workflow_design.md](workflow_design.md)：库存预警、自动补货等工作流设计与状态机约束。
 - [mcp_skill_design.md](mcp_skill_design.md)：MCP 注册中心、SKILL 协议、调用日志和降级规则。
+- [bi_dashboard.md](bi_dashboard.md)：前后端分离 BI 看板设计，覆盖第一、二阶段测试与运营观察。
 
 ## 3. 使用建议
 

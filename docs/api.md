@@ -159,6 +159,39 @@
 - `product_id`
 - `forecast_days`
 
+### 3.6 BI 看板接口
+
+`GET /api/dashboard/overview`
+
+用途：输出总览 KPI，辅助第一、二阶段测试和后续运营观察。
+
+`GET /api/dashboard/recommendation-funnel`
+
+用途：输出推荐漏斗、趋势和场景表现。
+
+`GET /api/dashboard/product-selection`
+
+用途：输出商品分层、选品得分和风险商品。
+
+`GET /api/dashboard/user-profiles`
+
+用途：输出用户画像分布和偏好分布。
+
+`GET /api/dashboard/inventory-health`
+
+用途：输出库存健康、低库存和缺货风险。
+
+建议通用参数：
+
+- `tenant_id`
+- `merchant_id`
+- `request_id`
+- `start_date`
+- `end_date`
+- `scene`
+- `category_id`
+- `limit`
+
 ## 4. 接口实现优先级
 
 ### 第一优先级

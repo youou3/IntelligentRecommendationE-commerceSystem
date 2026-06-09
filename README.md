@@ -24,9 +24,17 @@
 - 智能选品评分接口
 - 商品分层与运营建议
 
+### BI 看板
+
+- 前后端分离的可视化看板
+- 推荐漏斗 / 选品 / 用户画像 / 库存健康
+- 辅助第一、二阶段测试和后续运营观察
+- 支持演示模式，无需本地数据库也能查看
+- 详细设计见 [docs/bi_dashboard.md](docs/bi_dashboard.md)
+
 ## 1. 本地启动
 
-### 1.1 安装依赖
+### 1.1 安装后端依赖
 
 ```bash
 python3 -m pip install -r requirements.txt
@@ -48,13 +56,63 @@ python init_db.py
 
 如果 MySQL 连接正常、账号具备建表权限，这会在 `intelligent_recommendation` 库里创建当前模型对应的表。脚本会自动加载 `.env`。若执行时报 `Can't connect to MySQL server`，先检查 `.env` 里的 `MYSQL_HOST`、`MYSQL_PORT` 和数据库服务是否可达。
 
-### 1.4 启动服务
+### 1.4 生成测试种子数据
+
+```bash
+python seed_data.py
+```
+
+该脚本会创建一批可用于看板和推荐/选品测试的示例数据，包括商品、库存、画像、反馈和 Mongo 行为日志。
+
+### 1.5 启动后端服务
 
 ```bash
 python run.py
 ```
 
 默认监听 `http://127.0.0.1:5000`。
+
+### 1.6 启动 BI 前端
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+默认监听 `http://127.0.0.1:5173`，并通过 Vite 代理访问后端 `/api`。
+
+### 1.7 构建前端
+
+```bash
+cd web
+npm run build
+```
+
+### 1.4 启动后端服务
+
+```bash
+python run.py
+```
+
+默认监听 `http://127.0.0.1:5000`。
+
+### 1.5 启动 BI 前端
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+默认监听 `http://127.0.0.1:5173`，并通过 Vite 代理访问后端 `/api`。
+
+### 1.6 构建前端
+
+```bash
+cd web
+npm run build
+```
 
 ## 2. 运行测试
 
@@ -97,6 +155,14 @@ python3 -m pytest
 ### 选品评分
 
 - `POST /api/products/selection-score`
+
+### BI 看板
+
+- `GET /api/dashboard/overview`
+- `GET /api/dashboard/recommendation-funnel`
+- `GET /api/dashboard/product-selection`
+- `GET /api/dashboard/user-profiles`
+- `GET /api/dashboard/inventory-health`
 
 ## 4. 配置说明
 
