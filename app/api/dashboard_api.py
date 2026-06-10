@@ -72,3 +72,29 @@ def inventory_health():
     except ValueError as exc:
         return jsonify(error_response('BAD_REQUEST', str(exc), payload.get('request_id'))), 400
     return jsonify(success_response(service.get_inventory_health(filters), payload.get('request_id')))
+
+
+@dashboard_bp.get('/replenishment-review')
+def replenishment_review():
+    payload = request.args.to_dict(flat=True)
+    missing = require_fields(payload, ['tenant_id', 'merchant_id'])
+    if missing:
+        return jsonify(error_response('BAD_REQUEST', f'missing fields: {", ".join(missing)}', payload.get('request_id'))), 400
+    try:
+        filters = service._parse_filters(payload)
+    except ValueError as exc:
+        return jsonify(error_response('BAD_REQUEST', str(exc), payload.get('request_id'))), 400
+    return jsonify(success_response(service.get_replenishment_review(filters), payload.get('request_id')))
+
+
+@dashboard_bp.get('/operations-review')
+def operations_review():
+    payload = request.args.to_dict(flat=True)
+    missing = require_fields(payload, ['tenant_id', 'merchant_id'])
+    if missing:
+        return jsonify(error_response('BAD_REQUEST', f'missing fields: {", ".join(missing)}', payload.get('request_id'))), 400
+    try:
+        filters = service._parse_filters(payload)
+    except ValueError as exc:
+        return jsonify(error_response('BAD_REQUEST', str(exc), payload.get('request_id'))), 400
+    return jsonify(success_response(service.get_operations_review(filters), payload.get('request_id')))

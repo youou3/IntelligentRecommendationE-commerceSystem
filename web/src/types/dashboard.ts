@@ -123,3 +123,19 @@ export interface WorkflowRunView {
   summary: string
   created_at: string
 }
+
+export interface ReplenishmentReviewData {
+  summary: Record<string, number>
+  status_distribution: Array<Record<string, unknown>>
+  items: Array<Record<string, unknown>>
+}
+
+export interface OperationsReviewData {
+  summary: Record<string, unknown>
+  recommendation: Record<string, unknown>
+  users: Record<string, unknown>
+  products: Record<string, unknown>
+  inventory: Record<string, unknown>
+  replenishment: ReplenishmentReviewData
+  mcp: Record<string, unknown>
+}

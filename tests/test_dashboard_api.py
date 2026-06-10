@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
 
 from app.core.database import db, get_mongo_db
-from app.models.inventory import Inventory
+from app.models.inventory import Inventory, ReplenishmentOrder
+from app.models.order import Order, OrderItem
 from app.models.product import Product
 from app.models.recommendation_feedback import RecommendationFeedback
 from app.models.user_profile import UserProfile
@@ -104,3 +105,115 @@ def test_dashboard_inventory_health_returns_risk_products(client, app):
     assert body['success'] is True
     assert body['data']['summary']['total_products'] >= 2
     assert any(item['risk_level'] in ('low_stock', 'out_of_stock', 'status_or_score') for item in body['data']['risk_products'])
+
+
+def test_dashboard_replenishment_review_returns_replay_metrics(client, app):
+    _seed_dashboard_data(app)
+    with app.app_context():
+        now = datetime.utcnow()
+        db.session.add(ReplenishmentOrder(
+            tenant_id='T1',
+            merchant_id='M1',
+            product_id='P1',
+            suggest_quantity=12,
+            approved_quantity=10,
+            status='received',
+            request_id='REQ_REPLENISH_REVIEW',
+            forecast_days=14,
+            reason=['inventory_warning_triggered'],
+            risk_note=[],
+            created_at=now,
+        ))
+        db.session.add(Order(
+            id='O_REVIEW_1',
+            tenant_id='T1',
+            merchant_id='M1',
+            user_id='U1',
+            order_status='paid',
+            pay_status='paid',
+            total_amount=198,
+            created_at=now,
+        ))
+        db.session.add(OrderItem(
+            tenant_id='T1',
+            merchant_id='M1',
+            order_id='O_REVIEW_1',
+            product_id='P1',
+            quantity=2,
+            price=99,
+            amount=198,
+            created_at=now,
+        ))
+        db.session.add(ReplenishmentOrder(
+            tenant_id='T1',
+            merchant_id='M2',
+            product_id='P_OTHER',
+            suggest_quantity=99,
+            status='pending_approval',
+            request_id='REQ_OTHER_MERCHANT',
+            forecast_days=14,
+            reason=[],
+            risk_note=[],
+            created_at=now,
+        ))
+        db.session.commit()
+
+    response = client.get('/api/dashboard/replenishment-review', query_string={
+        'tenant_id': 'T1',
+        'merchant_id': 'M1',
+        'request_id': 'REQ_DASH_REPLENISH_REVIEW',
+    })
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body['success'] is True
+    assert body['data']['summary']['replenishment_orders'] == 1
+    assert body['data']['summary']['suggested_quantity'] == 12
+    assert body['data']['items'][0]['product_id'] == 'P1'
+    assert body['data']['items'][0]['sold_quantity'] == 2
+
+
+def test_dashboard_operations_review_is_tenant_merchant_scoped(client, app):
+    _seed_dashboard_data(app)
+    with app.app_context():
+        mongo_db = get_mongo_db()
+        now = datetime.utcnow()
+        mongo_db.skill_call_logs.insert_one({
+            'tenant_id': 'T1',
+            'merchant_id': 'M1',
+            'skill_name': 'recommendation',
+            'skill_version': '1.0.0',
+            'request_id': 'REQ_SKILL_M1',
+            'input_payload': {},
+            'output_payload': {},
+            'status': 'success',
+            'cost_ms': 12,
+            'fallback_used': False,
+            'created_at': now,
+        })
+        mongo_db.skill_call_logs.insert_one({
+            'tenant_id': 'T1',
+            'merchant_id': 'M2',
+            'skill_name': 'recommendation',
+            'skill_version': '1.0.0',
+            'request_id': 'REQ_SKILL_M2',
+            'input_payload': {},
+            'output_payload': {},
+            'status': 'failed',
+            'cost_ms': 99,
+            'fallback_used': True,
+            'created_at': now,
+        })
+
+    response = client.get('/api/dashboard/operations-review', query_string={
+        'tenant_id': 'T1',
+        'merchant_id': 'M1',
+        'request_id': 'REQ_DASH_OPERATIONS_REVIEW',
+    })
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body['success'] is True
+    assert body['data']['summary']['merchant_id'] == 'M1'
+    assert body['data']['summary']['skill_calls'] == 1
+    assert body['data']['summary']['skill_failed_calls'] == 0
+    assert 'recommendation' in body['data']
+    assert 'replenishment' in body['data']

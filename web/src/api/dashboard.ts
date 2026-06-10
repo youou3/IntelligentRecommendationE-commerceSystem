@@ -4,7 +4,9 @@ import type {
   FunnelData,
   InventoryHealthData,
   InventoryWarningsData,
+  OperationsReviewData,
   OverviewData,
+  ReplenishmentReviewData,
   ReplenishmentSuggestData,
   ReplenishmentSuggestPayload,
   RunInventoryWarningsPayload,
@@ -325,6 +327,88 @@ function buildDemoReplenishment(payload: Partial<ReplenishmentSuggestPayload>): 
   }
 }
 
+function buildDemoReplenishmentReview(): ReplenishmentReviewData {
+  return {
+    summary: {
+      replenishment_orders: 6,
+      suggested_quantity: 168,
+      approved_quantity: 132,
+      pending_approval: 2,
+      received_orders: 3,
+      closed_orders: 1,
+      approval_rate: 0.6667,
+      receive_rate: 0.6667,
+    },
+    status_distribution: [
+      { status: 'pending_approval', count: 2 },
+      { status: 'received', count: 3 },
+      { status: 'closed', count: 1 },
+    ],
+    items: [
+      {
+        replenishment_order_id: 9001,
+        product_id: 'P10009',
+        product_name: 'Winter Jacket',
+        category_id: 'C10009',
+        suggest_quantity: 42,
+        approved_quantity: 36,
+        status: 'received',
+        effective_stock: 24,
+        sold_quantity: 11,
+        sales_amount: 3289,
+        fulfill_rate: 0.8571,
+        sell_through_rate: 0.3056,
+      },
+      {
+        replenishment_order_id: 9002,
+        product_id: 'P10010',
+        product_name: 'Sport Socks',
+        category_id: 'C10010',
+        suggest_quantity: 30,
+        approved_quantity: null,
+        status: 'pending_approval',
+        effective_stock: 2,
+        sold_quantity: 4,
+        sales_amount: 156,
+        fulfill_rate: 0,
+        sell_through_rate: 0.1333,
+      },
+    ],
+  }
+}
+
+function buildDemoOperationsReview(): OperationsReviewData {
+  return {
+    summary: {
+      tenant_id: 'T1',
+      merchant_id: 'M1',
+      recommendation_conversion_rate: 0.0417,
+      profile_coverage: 0.5854,
+      risk_products: 3,
+      low_stock_products: 6,
+      replenishment_orders: 6,
+      skill_calls: 42,
+      skill_failed_calls: 1,
+      skill_fallback_calls: 2,
+      avg_skill_cost_ms: 18.4,
+      workflow_runs: 8,
+      workflow_failed_runs: 0,
+    },
+    recommendation: { kpis: buildDemoOverview({}).kpis, funnel: buildDemoFunnel().funnel, by_scene: buildDemoFunnel().by_scene },
+    users: { summary: buildDemoProfiles().summary, top_tags: buildDemoProfiles().top_tags },
+    products: { high_value_products: buildDemoSelection().top_products, risk_products: buildDemoSelection().risk_products },
+    inventory: { summary: buildDemoInventory().summary, low_stock_products: buildDemoInventory().risk_products },
+    replenishment: buildDemoReplenishmentReview(),
+    mcp: {
+      skill_call_health: { total: 42, failed: 1, fallback: 2, avg_cost_ms: 18.4 },
+      recent_workflows: [
+        { workflow_name: 'inventory_warning', run_id: 'RUN-DEMO-001', request_id: 'REQ-DEMO', status: 'success', created_at: '2026-06-10T09:00:00' },
+        { workflow_name: 'auto_replenishment', run_id: 'RUN-DEMO-002', request_id: 'REQ-DEMO', status: 'success', created_at: '2026-06-10T09:05:00' },
+      ],
+    },
+  }
+}
+
 export async function fetchOverview(filters: Partial<DashboardFilters>) {
   if (isDemoMode()) return buildDemoOverview(filters)
   return request<OverviewData>(`/api/dashboard/overview?${toQuery(filters)}`)
@@ -368,4 +452,14 @@ export async function runInventoryWarnings(payload: RunInventoryWarningsPayload)
 export async function suggestReplenishment(payload: ReplenishmentSuggestPayload) {
   if (isDemoMode()) return buildDemoReplenishment(payload)
   return postJson<ReplenishmentSuggestData>('/api/inventory/replenishment/suggest', payload as unknown as Record<string, unknown>)
+}
+
+export async function fetchReplenishmentReview(filters: Partial<DashboardFilters>) {
+  if (isDemoMode()) return buildDemoReplenishmentReview()
+  return request<ReplenishmentReviewData>(`/api/dashboard/replenishment-review?${toQuery(filters)}`)
+}
+
+export async function fetchOperationsReview(filters: Partial<DashboardFilters>) {
+  if (isDemoMode()) return buildDemoOperationsReview()
+  return request<OperationsReviewData>(`/api/dashboard/operations-review?${toQuery(filters)}`)
 }

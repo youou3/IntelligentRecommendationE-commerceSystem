@@ -390,6 +390,35 @@
         <section v-if="activePage === 'replenishment'" class="page-section main-grid">
           <article class="panel summary-panel">
             <div class="panel-head">
+              <h2>补货复盘</h2>
+              <span>第五阶段</span>
+            </div>
+            <div class="kpi-grid compact">
+              <div class="mini-kpi">
+                <div class="mini-kpi-label">补货单</div>
+                <div class="mini-kpi-value">{{ replenishmentReview?.summary.replenishment_orders ?? 0 }}</div>
+                <div class="mini-kpi-sub">周期内生成</div>
+              </div>
+              <div class="mini-kpi">
+                <div class="mini-kpi-label">建议数量</div>
+                <div class="mini-kpi-value">{{ replenishmentReview?.summary.suggested_quantity ?? 0 }}</div>
+                <div class="mini-kpi-sub">suggested</div>
+              </div>
+              <div class="mini-kpi">
+                <div class="mini-kpi-label">审批率</div>
+                <div class="mini-kpi-value">{{ formatPercent(replenishmentReview?.summary.approval_rate ?? 0) }}</div>
+                <div class="mini-kpi-sub">approved / total</div>
+              </div>
+              <div class="mini-kpi">
+                <div class="mini-kpi-label">入库率</div>
+                <div class="mini-kpi-value">{{ formatPercent(replenishmentReview?.summary.receive_rate ?? 0) }}</div>
+                <div class="mini-kpi-sub">received / total</div>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel summary-panel">
+            <div class="panel-head">
               <h2>补货建议</h2>
               <span>自动补货 WORKFLOW</span>
             </div>
@@ -457,13 +486,125 @@
               <span v-for="risk in replenishmentResult.risk_note" :key="risk" class="tag risk">{{ risk }}</span>
             </div>
           </article>
+
+          <article class="panel table-card wide-table">
+            <div class="panel-head">
+              <h2>补货效果复盘</h2>
+              <span>建议 / 审批 / 销售</span>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>商品</th>
+                  <th>状态</th>
+                  <th>建议量</th>
+                  <th>审批量</th>
+                  <th>有效库存</th>
+                  <th>销量</th>
+                  <th>采纳率</th>
+                  <th>售罄率</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in replenishmentReview?.items || []" :key="String(row.replenishment_order_id)">
+                  <td>{{ row.product_name || row.product_id }}</td>
+                  <td><span class="tag potential">{{ row.status }}</span></td>
+                  <td>{{ row.suggest_quantity }}</td>
+                  <td>{{ row.approved_quantity ?? '-' }}</td>
+                  <td>{{ row.effective_stock }}</td>
+                  <td>{{ row.sold_quantity }}</td>
+                  <td>{{ formatPercent(row.fulfill_rate) }}</td>
+                  <td>{{ formatPercent(row.sell_through_rate) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </article>
         </section>
 
         <section v-if="activePage === 'workflow'" class="page-section">
+          <section class="top-grid">
+            <article class="panel summary-panel">
+              <div class="panel-head">
+                <h2>运营复盘</h2>
+                <span>推荐 / 画像 / 库存</span>
+              </div>
+              <div class="kpi-grid compact">
+                <div class="mini-kpi">
+                  <div class="mini-kpi-label">推荐转化率</div>
+                  <div class="mini-kpi-value">{{ formatPercent(operationsReview?.summary.recommendation_conversion_rate ?? 0) }}</div>
+                  <div class="mini-kpi-sub">convert / exposure</div>
+                </div>
+                <div class="mini-kpi">
+                  <div class="mini-kpi-label">画像覆盖</div>
+                  <div class="mini-kpi-value">{{ formatPercent(operationsReview?.summary.profile_coverage ?? 0) }}</div>
+                  <div class="mini-kpi-sub">profiled users</div>
+                </div>
+                <div class="mini-kpi">
+                  <div class="mini-kpi-label">风险商品</div>
+                  <div class="mini-kpi-value">{{ operationsReview?.summary.risk_products ?? 0 }}</div>
+                  <div class="mini-kpi-sub">selection risk</div>
+                </div>
+                <div class="mini-kpi">
+                  <div class="mini-kpi-label">低库存</div>
+                  <div class="mini-kpi-value">{{ operationsReview?.summary.low_stock_products ?? 0 }}</div>
+                  <div class="mini-kpi-sub">inventory risk</div>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel summary-panel">
+              <div class="panel-head">
+                <h2>MCP 健康</h2>
+                <span>SKILL 调用</span>
+              </div>
+              <div class="kpi-grid compact">
+                <div class="mini-kpi">
+                  <div class="mini-kpi-label">调用数</div>
+                  <div class="mini-kpi-value">{{ operationsReview?.summary.skill_calls ?? 0 }}</div>
+                  <div class="mini-kpi-sub">skill_call_logs</div>
+                </div>
+                <div class="mini-kpi">
+                  <div class="mini-kpi-label">失败</div>
+                  <div class="mini-kpi-value">{{ operationsReview?.summary.skill_failed_calls ?? 0 }}</div>
+                  <div class="mini-kpi-sub">failed</div>
+                </div>
+                <div class="mini-kpi">
+                  <div class="mini-kpi-label">降级</div>
+                  <div class="mini-kpi-value">{{ operationsReview?.summary.skill_fallback_calls ?? 0 }}</div>
+                  <div class="mini-kpi-sub">fallback</div>
+                </div>
+                <div class="mini-kpi">
+                  <div class="mini-kpi-label">平均耗时</div>
+                  <div class="mini-kpi-value">{{ operationsReview?.summary.avg_skill_cost_ms ?? 0 }}</div>
+                  <div class="mini-kpi-sub">ms</div>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel summary-panel">
+              <div class="panel-head">
+                <h2>工作流健康</h2>
+                <span>workflow_runs</span>
+              </div>
+              <div class="kpi-grid compact">
+                <div class="mini-kpi">
+                  <div class="mini-kpi-label">运行次数</div>
+                  <div class="mini-kpi-value">{{ operationsReview?.summary.workflow_runs ?? 0 }}</div>
+                  <div class="mini-kpi-sub">total</div>
+                </div>
+                <div class="mini-kpi">
+                  <div class="mini-kpi-label">失败运行</div>
+                  <div class="mini-kpi-value">{{ operationsReview?.summary.workflow_failed_runs ?? 0 }}</div>
+                  <div class="mini-kpi-sub">failed</div>
+                </div>
+              </div>
+            </article>
+          </section>
+
           <article class="panel table-card">
             <div class="panel-head">
               <h2>最近工作流结果</h2>
-              <span>本次页面会话</span>
+              <span>本次会话 + 后端复盘</span>
             </div>
             <table>
               <thead>
@@ -486,7 +627,7 @@
                   <td>{{ row.created_at }}</td>
                 </tr>
                 <tr v-if="workflowRuns.length === 0">
-                  <td colspan="6">暂无运行记录，先在预警页或补货页触发一次工作流。</td>
+                  <td colspan="6">暂无本次会话运行记录，可查看上方后端复盘指标。</td>
                 </tr>
               </tbody>
             </table>
@@ -504,8 +645,10 @@ import {
   fetchFunnel,
   fetchInventory,
   fetchInventoryWarnings,
+  fetchOperationsReview,
   fetchOverview,
   fetchProfiles,
+  fetchReplenishmentReview,
   fetchSelection,
   runInventoryWarnings,
   suggestReplenishment,
@@ -516,7 +659,9 @@ import type {
   InventoryHealthData,
   InventoryWarningItem,
   InventoryWarningsData,
+  OperationsReviewData,
   OverviewData,
+  ReplenishmentReviewData,
   ReplenishmentSuggestData,
   SelectionData,
   UserProfileData,
@@ -550,6 +695,8 @@ const selection = ref<SelectionData | null>(null)
 const profiles = ref<UserProfileData | null>(null)
 const inventory = ref<InventoryHealthData | null>(null)
 const warningData = ref<InventoryWarningsData | null>(null)
+const replenishmentReview = ref<ReplenishmentReviewData | null>(null)
+const operationsReview = ref<OperationsReviewData | null>(null)
 const replenishmentResult = ref<ReplenishmentSuggestData | null>(null)
 const workflowRuns = ref<WorkflowRunView[]>([])
 
@@ -679,13 +826,15 @@ async function reloadAll() {
   actionMessage.value = ''
   const nextFilters = { ...filters }
   try {
-    const [overviewData, funnelData, selectionData, profileData, inventoryData, warnings] = await Promise.all([
+    const [overviewData, funnelData, selectionData, profileData, inventoryData, warnings, replenishmentReviewData, operationsReviewData] = await Promise.all([
       fetchOverview(nextFilters),
       fetchFunnel(nextFilters),
       fetchSelection(nextFilters),
       fetchProfiles(nextFilters),
       fetchInventory(nextFilters),
       fetchInventoryWarnings(nextFilters),
+      fetchReplenishmentReview(nextFilters),
+      fetchOperationsReview(nextFilters),
     ])
     overview.value = overviewData
     funnel.value = funnelData
@@ -693,6 +842,8 @@ async function reloadAll() {
     profiles.value = profileData
     inventory.value = inventoryData
     warningData.value = warnings
+    replenishmentReview.value = replenishmentReviewData
+    operationsReview.value = operationsReviewData
     await nextTick()
     renderCharts()
   } catch (error) {

@@ -1,8 +1,9 @@
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
-from app.core.database import get_mongo_db
-from app.models.inventory import Inventory
+from app.core.database import db, get_mongo_db
+from app.models.inventory import Inventory, InventoryWarning, ReplenishmentOrder
+from app.models.order import Order, OrderItem
 from app.models.product import Product
 from app.models.product_selection import ProductSelectionSnapshot
 from app.models.recommendation_feedback import RecommendationFeedback
@@ -104,6 +105,59 @@ class DashboardService:
             merchant_id=filters['merchant_id'],
         ).all()
         return rows
+
+    def _workflow_rows(self, filters):
+        mongo_db = get_mongo_db()
+        if mongo_db is None:
+            return []
+        query = {
+            'tenant_id': filters['tenant_id'],
+            'merchant_id': filters['merchant_id'],
+            'created_at': {'$gte': filters['start_date'], '$lt': filters['end_exclusive_dt']},
+        }
+        return list(mongo_db.workflow_runs.find(query).sort('created_at', -1).limit(filters['limit']))
+
+    def _skill_call_rows(self, filters):
+        mongo_db = get_mongo_db()
+        if mongo_db is None:
+            return []
+        query = {
+            'tenant_id': filters['tenant_id'],
+            'merchant_id': filters['merchant_id'],
+            'created_at': {'$gte': filters['start_date'], '$lt': filters['end_exclusive_dt']},
+        }
+        return list(mongo_db.skill_call_logs.find(query).sort('created_at', -1).limit(200))
+
+    def _paid_sales_by_product(self, filters, product_ids=None):
+        query = db.session.query(
+            OrderItem.product_id,
+            db.func.coalesce(db.func.sum(OrderItem.quantity), 0),
+            db.func.coalesce(db.func.sum(OrderItem.amount), 0),
+        ).join(
+            Order,
+            db.and_(
+                Order.id == OrderItem.order_id,
+                Order.tenant_id == OrderItem.tenant_id,
+                Order.merchant_id == OrderItem.merchant_id,
+            ),
+        ).filter(
+            OrderItem.tenant_id == filters['tenant_id'],
+            OrderItem.merchant_id == filters['merchant_id'],
+            Order.created_at >= filters['start_date'],
+            Order.created_at < filters['end_exclusive_dt'],
+            Order.pay_status == 'paid',
+            Order.order_status.in_(('paid', 'completed', 'shipped')),
+        )
+        if product_ids:
+            query = query.filter(OrderItem.product_id.in_(product_ids))
+        rows = query.group_by(OrderItem.product_id).all()
+        return {
+            product_id: {
+                'sold_quantity': int(quantity or 0),
+                'sales_amount': float(amount or 0),
+            }
+            for product_id, quantity, amount in rows
+        }
 
     def get_overview(self, filters):
         mongo_data = self._mongo_logs(filters)
@@ -381,4 +435,148 @@ class DashboardService:
                 for category_id, row in category_counter.items()
             ],
             'risk_products': risk_products[:filters['limit']],
+        }
+
+    def get_replenishment_review(self, filters):
+        query = ReplenishmentOrder.query.filter(
+            ReplenishmentOrder.tenant_id == filters['tenant_id'],
+            ReplenishmentOrder.merchant_id == filters['merchant_id'],
+            ReplenishmentOrder.created_at >= filters['start_date'],
+            ReplenishmentOrder.created_at < filters['end_exclusive_dt'],
+        )
+        rows = query.order_by(ReplenishmentOrder.created_at.desc()).all()
+        product_ids = [row.product_id for row in rows]
+        product_map = self._product_map(filters)
+        inventory_map = self._inventory_map(filters)
+        sales_map = self._paid_sales_by_product(filters, product_ids)
+
+        status_counter = Counter(row.status for row in rows)
+        suggested_total = sum(int(row.suggest_quantity or 0) for row in rows)
+        approved_total = sum(int(row.approved_quantity or 0) for row in rows if row.approved_quantity is not None)
+        pending_approval = sum(1 for row in rows if row.status == 'pending_approval')
+        received_orders = sum(1 for row in rows if row.status == 'received')
+        closed_orders = sum(1 for row in rows if row.status == 'closed')
+
+        items = []
+        for row in rows:
+            product = product_map.get(row.product_id)
+            inventory = inventory_map.get(row.product_id)
+            sales = sales_map.get(row.product_id, {'sold_quantity': 0, 'sales_amount': 0})
+            effective_stock = (inventory.available_stock - inventory.locked_stock) if inventory else 0
+            approved_quantity = row.approved_quantity if row.approved_quantity is not None else 0
+            fulfill_rate = self._safe_rate(approved_quantity, row.suggest_quantity)
+            sell_through_rate = self._safe_rate(sales['sold_quantity'], approved_quantity or row.suggest_quantity)
+            items.append({
+                'replenishment_order_id': row.id,
+                'product_id': row.product_id,
+                'product_name': product.name if product else None,
+                'category_id': product.category_id if product else None,
+                'suggest_quantity': row.suggest_quantity,
+                'approved_quantity': row.approved_quantity,
+                'status': row.status,
+                'forecast_days': row.forecast_days,
+                'reason': row.reason,
+                'risk_note': row.risk_note,
+                'effective_stock': effective_stock,
+                'sold_quantity': sales['sold_quantity'],
+                'sales_amount': sales['sales_amount'],
+                'fulfill_rate': fulfill_rate,
+                'sell_through_rate': sell_through_rate,
+                'created_at': row.created_at.isoformat() if row.created_at else None,
+            })
+
+        items.sort(key=lambda item: (item['status'] in ('pending_approval', 'draft'), item['sell_through_rate'], item['suggest_quantity']), reverse=True)
+        return {
+            'summary': {
+                'replenishment_orders': len(rows),
+                'suggested_quantity': suggested_total,
+                'approved_quantity': approved_total,
+                'pending_approval': pending_approval,
+                'received_orders': received_orders,
+                'closed_orders': closed_orders,
+                'approval_rate': self._safe_rate(sum(1 for row in rows if row.status in ('approved', 'purchasing', 'in_transit', 'received', 'closed')), len(rows)),
+                'receive_rate': self._safe_rate(received_orders + closed_orders, len(rows)),
+            },
+            'status_distribution': [{'status': status, 'count': count} for status, count in status_counter.items()],
+            'items': items[:filters['limit']],
+        }
+
+    def get_operations_review(self, filters):
+        overview = self.get_overview(filters)
+        funnel = self.get_recommendation_funnel(filters)
+        selection = self.get_product_selection(filters)
+        profiles = self.get_user_profiles(filters)
+        inventory = self.get_inventory_health(filters)
+        replenishment = self.get_replenishment_review(filters)
+        workflows = self._workflow_rows(filters)
+        skill_calls = self._skill_call_rows(filters)
+
+        failed_skill_calls = sum(1 for row in skill_calls if row.get('status') == 'failed')
+        fallback_skill_calls = sum(1 for row in skill_calls if row.get('fallback_used'))
+        avg_cost_ms = round(sum(float(row.get('cost_ms') or 0) for row in skill_calls) / len(skill_calls), 2) if skill_calls else 0
+        workflow_failed = sum(1 for row in workflows if row.get('status') in ('failed', 'error'))
+
+        risk_products = selection['risk_products'][:filters['limit']]
+        high_value_products = selection['top_products'][:filters['limit']]
+        low_stock_products = inventory['risk_products'][:filters['limit']]
+        strong_intent_users = [
+            row for row in profiles['stage_distribution']
+            if row.get('user_stage') in ('strong_intent', 'converted')
+        ]
+
+        return {
+            'summary': {
+                'tenant_id': filters['tenant_id'],
+                'merchant_id': filters['merchant_id'],
+                'start_date': filters['start_date'].date().isoformat(),
+                'end_date': filters['end_date'].date().isoformat(),
+                'recommendation_conversion_rate': funnel['summary']['conversion_rate'],
+                'profile_coverage': profiles['summary']['profile_coverage'],
+                'risk_products': len(risk_products),
+                'low_stock_products': inventory['summary']['low_stock_products'],
+                'replenishment_orders': replenishment['summary']['replenishment_orders'],
+                'skill_calls': len(skill_calls),
+                'skill_failed_calls': failed_skill_calls,
+                'skill_fallback_calls': fallback_skill_calls,
+                'avg_skill_cost_ms': avg_cost_ms,
+                'workflow_runs': len(workflows),
+                'workflow_failed_runs': workflow_failed,
+            },
+            'recommendation': {
+                'kpis': overview['kpis'],
+                'funnel': funnel['funnel'],
+                'by_scene': funnel['by_scene'],
+            },
+            'users': {
+                'summary': profiles['summary'],
+                'strong_intent_distribution': strong_intent_users,
+                'top_tags': profiles['top_tags'],
+            },
+            'products': {
+                'high_value_products': high_value_products,
+                'risk_products': risk_products,
+            },
+            'inventory': {
+                'summary': inventory['summary'],
+                'low_stock_products': low_stock_products,
+            },
+            'replenishment': replenishment,
+            'mcp': {
+                'skill_call_health': {
+                    'total': len(skill_calls),
+                    'failed': failed_skill_calls,
+                    'fallback': fallback_skill_calls,
+                    'avg_cost_ms': avg_cost_ms,
+                },
+                'recent_workflows': [
+                    {
+                        'workflow_name': row.get('workflow_name'),
+                        'run_id': row.get('run_id'),
+                        'request_id': row.get('request_id'),
+                        'status': row.get('status'),
+                        'created_at': row.get('created_at').isoformat() if row.get('created_at') else None,
+                    }
+                    for row in workflows[:filters['limit']]
+                ],
+            },
         }
