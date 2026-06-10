@@ -1,4 +1,4 @@
-from app.models.inventory import Inventory
+from app.models.inventory import Inventory, InventoryLog, InventoryWarning, ReplenishmentOrder
 from app.models.order import Order, OrderItem
 from app.models.product import Product
 from app.models.product_selection import ProductSelectionSnapshot
