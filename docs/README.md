@@ -19,6 +19,7 @@
 - [workflow_design.md](workflow_design.md)：库存预警、自动补货等工作流设计与状态机约束。
 - [mcp_skill_design.md](mcp_skill_design.md)：MCP 注册中心、SKILL 协议、调用日志和降级规则。
 - [bi_dashboard.md](bi_dashboard.md)：前后端分离 BI 看板设计，覆盖第一、二阶段测试与运营观察。
+- [phase3_dashboard_plan.md](phase3_dashboard_plan.md)：第三阶段库存预警、补货建议接入看板，以及左侧按钮多页面改造实施规划。
 
 ## 3. 使用建议
 

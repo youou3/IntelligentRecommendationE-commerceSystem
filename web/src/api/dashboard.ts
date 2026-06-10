@@ -1,9 +1,13 @@
-import { request } from './client'
+import { postJson, request } from './client'
 import type {
   DashboardFilters,
   FunnelData,
   InventoryHealthData,
+  InventoryWarningsData,
   OverviewData,
+  ReplenishmentSuggestData,
+  ReplenishmentSuggestPayload,
+  RunInventoryWarningsPayload,
   SelectionData,
   UserProfileData,
 } from '../types/dashboard'
@@ -19,6 +23,11 @@ function toQuery(filters: Partial<DashboardFilters>) {
 }
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
+const DEMO_STORAGE_KEY = 'ir_dashboard_demo_mode'
+
+function isDemoMode() {
+  return DEMO_MODE || localStorage.getItem(DEMO_STORAGE_KEY) !== 'false'
+}
 
 const baseFilters = (filters: Partial<DashboardFilters>): DashboardFilters => ({
   tenant_id: filters.tenant_id || 'T1',
@@ -221,27 +230,142 @@ function buildDemoInventory(): InventoryHealthData {
   }
 }
 
+function buildDemoInventoryWarnings(): InventoryWarningsData {
+  return {
+    request_id: 'REQ-DEMO-WARNING',
+    page: 1,
+    page_size: 20,
+    total: 4,
+    items: [
+      {
+        id: 101,
+        product_id: 'P10009',
+        product_name: 'Winter Jacket',
+        category_id: 'C10009',
+        warning_level: 'critical',
+        warning_reason: ['effective_stock_empty'],
+        status: 'triggered',
+        forecast_daily_sales: 2.4,
+        stockout_days: 0,
+        suggested_action: 'replenish_now',
+        effective_stock: 0,
+        safe_stock: 5,
+        available_with_transit: 0,
+        created_at: '2026-06-10T09:00:00',
+      },
+      {
+        id: 102,
+        product_id: 'P10010',
+        product_name: 'Sport Socks',
+        category_id: 'C10010',
+        warning_level: 'high',
+        warning_reason: ['below_safe_stock'],
+        status: 'triggered',
+        forecast_daily_sales: 1.7,
+        stockout_days: 1.18,
+        suggested_action: 'prepare_replenishment',
+        effective_stock: 2,
+        safe_stock: 5,
+        available_with_transit: 2,
+        created_at: '2026-06-10T09:05:00',
+      },
+      {
+        id: 103,
+        product_id: 'P10002',
+        product_name: 'Summer Tee',
+        category_id: 'C10002',
+        warning_level: 'medium',
+        warning_reason: ['stockout_within_7_days', 'has_in_transit_stock'],
+        status: 'notified',
+        forecast_daily_sales: 3.2,
+        stockout_days: 5.62,
+        suggested_action: 'observe',
+        effective_stock: 9,
+        safe_stock: 8,
+        available_with_transit: 18,
+        created_at: '2026-06-10T09:12:00',
+      },
+      {
+        id: 104,
+        product_id: 'P10011',
+        product_name: 'Trail Cap',
+        category_id: 'C10001',
+        warning_level: 'high',
+        warning_reason: ['stockout_within_3_days'],
+        status: 'resolved',
+        forecast_daily_sales: 4.1,
+        stockout_days: 2.44,
+        suggested_action: 'prepare_replenishment',
+        effective_stock: 10,
+        safe_stock: 6,
+        available_with_transit: 10,
+        created_at: '2026-06-10T09:20:00',
+      },
+    ],
+  }
+}
+
+function buildDemoReplenishment(payload: Partial<ReplenishmentSuggestPayload>): ReplenishmentSuggestData {
+  return {
+    product_id: payload.product_id || 'P10009',
+    forecast_days: payload.forecast_days || 14,
+    suggest_quantity: 42,
+    target_stock: 39,
+    effective_stock: 0,
+    daily_sales: 2.4,
+    action: 'replenish',
+    reason: ['inventory_warning_triggered', 'hot_product_priority'],
+    risk_note: ['supplier_lead_time_should_be_checked'],
+    run_id: `RUN-DEMO-${Date.now().toString().slice(-6)}`,
+    replenishment_order_id: 9001,
+    status: 'pending_approval',
+    selection_score: 0.71,
+    product_layer: 'hot',
+    warning_level: 'critical',
+  }
+}
+
 export async function fetchOverview(filters: Partial<DashboardFilters>) {
-  if (DEMO_MODE) return buildDemoOverview(filters)
+  if (isDemoMode()) return buildDemoOverview(filters)
   return request<OverviewData>(`/api/dashboard/overview?${toQuery(filters)}`)
 }
 
 export async function fetchFunnel(filters: Partial<DashboardFilters>) {
-  if (DEMO_MODE) return buildDemoFunnel()
+  if (isDemoMode()) return buildDemoFunnel()
   return request<FunnelData>(`/api/dashboard/recommendation-funnel?${toQuery(filters)}`)
 }
 
 export async function fetchSelection(filters: Partial<DashboardFilters>) {
-  if (DEMO_MODE) return buildDemoSelection()
+  if (isDemoMode()) return buildDemoSelection()
   return request<SelectionData>(`/api/dashboard/product-selection?${toQuery(filters)}`)
 }
 
 export async function fetchProfiles(filters: Partial<DashboardFilters>) {
-  if (DEMO_MODE) return buildDemoProfiles()
+  if (isDemoMode()) return buildDemoProfiles()
   return request<UserProfileData>(`/api/dashboard/user-profiles?${toQuery(filters)}`)
 }
 
 export async function fetchInventory(filters: Partial<DashboardFilters>) {
-  if (DEMO_MODE) return buildDemoInventory()
+  if (isDemoMode()) return buildDemoInventory()
   return request<InventoryHealthData>(`/api/dashboard/inventory-health?${toQuery(filters)}`)
+}
+
+export async function fetchInventoryWarnings(filters: Partial<DashboardFilters>) {
+  if (isDemoMode()) return buildDemoInventoryWarnings()
+  return request<InventoryWarningsData>(`/api/inventory/warnings?${toQuery(filters)}`)
+}
+
+export async function runInventoryWarnings(payload: RunInventoryWarningsPayload) {
+  if (isDemoMode()) {
+    return {
+      ...buildDemoInventoryWarnings(),
+      run_id: `RUN-DEMO-${Date.now().toString().slice(-6)}`,
+    }
+  }
+  return postJson<InventoryWarningsData>('/api/inventory/warnings/run', payload as unknown as Record<string, unknown>)
+}
+
+export async function suggestReplenishment(payload: ReplenishmentSuggestPayload) {
+  if (isDemoMode()) return buildDemoReplenishment(payload)
+  return postJson<ReplenishmentSuggestData>('/api/inventory/replenishment/suggest', payload as unknown as Record<string, unknown>)
 }
