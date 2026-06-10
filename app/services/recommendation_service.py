@@ -1,16 +1,14 @@
 from datetime import datetime, timedelta
 
+from app.core.mcp import mcp_dispatcher
 from app.core.database import db, get_mongo_db
 from app.models.inventory import Inventory
 from app.models.product import Product
 from app.models.recommendation_feedback import RecommendationFeedback
 from app.models.user_profile import UserProfile
-from app.skills.recommendation_skill import RecommendationSkill
 
 
 class RecommendationService:
-    skill = RecommendationSkill()
-
     def _parse_exclude_ids(self, exclude_product_ids):
         if not exclude_product_ids:
             return set()
@@ -97,21 +95,37 @@ class RecommendationService:
                 'feedback_count': feedback_stat['click'] + feedback_stat['add_cart'] + feedback_stat['convert'],
             })
 
-        ranked_result = self.skill.execute({
-            'profile_tags': profile_tags,
-            'preferred_categories': preferred_categories,
-            'products': product_items,
-        })
+        ranked_response = mcp_dispatcher.call(
+            'recommendation',
+            {
+                'profile_tags': profile_tags,
+                'preferred_categories': preferred_categories,
+                'products': product_items,
+            },
+            tenant_id=tenant_id,
+            merchant_id=merchant_id,
+            request_id=request_id,
+            fallback_payload={'items': [], 'strategy': 'recommendation_fallback', 'cold_start': True},
+        )
+        ranked_result = ranked_response['data']
         ranked = ranked_result['items'][:limit]
         strategy = ranked_result.get('strategy', 'cosine_similarity')
         cold_start = ranked_result.get('cold_start', False)
         if not ranked and product_items:
-            ranked = self.skill.execute({
-                'profile_tags': {},
-                'preferred_categories': {},
-                'products': product_items,
-                'strategy': 'cold_start_popularity',
-            })['items'][:limit]
+            fallback_response = mcp_dispatcher.call(
+                'recommendation',
+                {
+                    'profile_tags': {},
+                    'preferred_categories': {},
+                    'products': product_items,
+                    'strategy': 'cold_start_popularity',
+                },
+                tenant_id=tenant_id,
+                merchant_id=merchant_id,
+                request_id=request_id,
+                fallback_payload={'items': []},
+            )
+            ranked = fallback_response['data']['items'][:limit]
             strategy = 'cold_start_fallback'
             cold_start = True
 

@@ -5,10 +5,12 @@ from app.api.profile_api import profile_bp
 from app.api.recommendation_api import recommendation_bp
 from app.api.feedback_api import feedback_bp
 from app.api.inventory_api import inventory_bp
+from app.api.mcp_api import mcp_bp
 from app.api.product_selection_api import product_selection_bp
 from app.api.dashboard_api import dashboard_bp
 from app.core.config import DevelopmentConfig
 from app.core.database import db, init_mongo
+from app.skills.registry import register_default_skills
 
 
 def create_app(config_object=DevelopmentConfig):
@@ -17,6 +19,7 @@ def create_app(config_object=DevelopmentConfig):
 
     db.init_app(flask_app)
     init_mongo(flask_app)
+    register_default_skills()
 
     import app.models  # noqa: F401
 
@@ -26,6 +29,7 @@ def create_app(config_object=DevelopmentConfig):
     flask_app.register_blueprint(feedback_bp)
     flask_app.register_blueprint(product_selection_bp)
     flask_app.register_blueprint(inventory_bp)
+    flask_app.register_blueprint(mcp_bp)
     flask_app.register_blueprint(dashboard_bp)
 
     @flask_app.get('/health')

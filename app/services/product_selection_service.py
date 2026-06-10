@@ -1,14 +1,12 @@
+from app.core.mcp import mcp_dispatcher
 from app.core.database import db
 from app.models.inventory import Inventory
 from app.models.product import Product
 from app.models.product_selection import ProductSelectionSnapshot
 from app.models.recommendation_feedback import RecommendationFeedback
-from app.skills.product_selection_skill import ProductSelectionSkill
 
 
 class ProductSelectionService:
-    skill = ProductSelectionSkill()
-
     def select_scores(self, tenant_id: str, merchant_id: str, request_id: str, product_ids=None, date_range=None, persist: bool = True):
         query = Product.query.filter_by(tenant_id=tenant_id, merchant_id=merchant_id)
         if product_ids:
@@ -67,7 +65,15 @@ class ProductSelectionService:
                 'has_feedback': sum(feedback_stat.values()) > 0,
             })
 
-        ranked = self.skill.execute({'products': payload_products})['items']
+        ranked_response = mcp_dispatcher.call(
+            'product_selection',
+            {'products': payload_products},
+            tenant_id=tenant_id,
+            merchant_id=merchant_id,
+            request_id=request_id,
+            fallback_payload={'items': []},
+        )
+        ranked = ranked_response['data']['items']
 
         if persist:
             for item in ranked:

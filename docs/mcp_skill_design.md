@@ -131,3 +131,66 @@ class BaseSkill:
 - SKILL 插件市场设计。
 - SKILL 权限控制设计。
 - SKILL 沙箱与隔离设计。
+
+## 11. 第四阶段落地说明
+
+当前第四阶段已落地最小可用 MCP 调度层：
+
+- `app/core/mcp.py`：提供 `SkillRegistry`、`MCPDispatcher`、统一标准响应和调用日志写入。
+- `app/skills/registry.py`：集中注册默认 SKILL，包括行为采集、用户画像、推荐、选品、库存预警和补货建议。
+- `GET /api/mcp/skills`：查询已注册 SKILL。
+- `GET /api/mcp/skill-call-logs`：按租户、商家、能力和状态查询最近调用日志。
+
+### 11.1 标准响应
+
+MCP 调用返回统一结构：
+
+```json
+{
+  "success": true,
+  "code": "OK",
+  "message": "success",
+  "request_id": "REQ10001",
+  "data": {},
+  "fallback_used": false
+}
+```
+
+### 11.2 调用日志
+
+每次通过 MCP 调用 SKILL 时写入 MongoDB `skill_call_logs`：
+
+- `tenant_id`
+- `merchant_id`
+- `skill_name`
+- `skill_version`
+- `request_id`
+- `input_payload`
+- `output_payload`
+- `status`
+- `cost_ms`
+- `error_message`
+- `fallback_used`
+- `created_at`
+
+MongoDB 不可用时不阻断业务主流程。
+
+### 11.3 已改造能力
+
+以下服务已通过 MCP 调用 SKILL：
+
+- `RecommendationService` -> `recommendation`
+- `ProductSelectionService` -> `product_selection`
+- `InventoryService.run_warning_workflow` -> `inventory_warning`
+- `InventoryService.suggest_replenishment` -> `replenishment`
+
+保留直接调用 SKILL 的单元测试能力，便于算法逻辑独立验证。
+
+### 11.4 降级策略
+
+当前已配置基础降级：
+
+- 推荐、选品、库存预警：降级为空结果列表，由业务服务继续执行已有兜底逻辑。
+- 补货建议：降级为 `manual_review`，建议补货量为 `0`，并返回风险说明。
+
+后续可继续把降级策略拆成按租户、商家、场景可配置的策略表。

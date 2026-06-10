@@ -2,18 +2,14 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from app.core.database import db, get_mongo_db
+from app.core.mcp import mcp_dispatcher
 from app.models.inventory import Inventory, InventoryLog, InventoryWarning, ReplenishmentOrder
 from app.models.order import Order, OrderItem
 from app.models.product import Product
 from app.services.product_selection_service import ProductSelectionService
-from app.skills.inventory_warning_skill import InventoryWarningSkill
-from app.skills.replenishment_skill import ReplenishmentSkill
 
 
 class InventoryService:
-    warning_skill = InventoryWarningSkill()
-    replenishment_skill = ReplenishmentSkill()
-
     def __init__(self):
         self.product_selection_service = ProductSelectionService()
 
@@ -98,8 +94,15 @@ class InventoryService:
             'persist': persist,
         }
         payload_items = self._warning_payload_items(tenant_id, merchant_id, product_ids, sales_days)
-        skill_result = self.warning_skill.execute({'items': payload_items})
-        items = skill_result['items']
+        skill_response = mcp_dispatcher.call(
+            'inventory_warning',
+            {'items': payload_items},
+            tenant_id=tenant_id,
+            merchant_id=merchant_id,
+            request_id=request_id,
+            fallback_payload={'items': []},
+        )
+        items = skill_response['data']['items']
 
         if persist:
             mongo_db = get_mongo_db()
@@ -237,7 +240,14 @@ class InventoryService:
             'product_layer': product_layer or (product.product_layer if product else None),
             'warning_level': warning.warning_level if warning else 'healthy',
         }
-        result = self.replenishment_skill.execute(payload)
+        skill_response = mcp_dispatcher.call(
+            'replenishment',
+            payload,
+            tenant_id=tenant_id,
+            merchant_id=merchant_id,
+            request_id=request_id,
+        )
+        result = skill_response['data']
         status = 'pending_approval' if result['suggest_quantity'] > 0 and result['action'] in ('replenish', 'small_batch_replenishment') else 'draft'
 
         order_id = None
